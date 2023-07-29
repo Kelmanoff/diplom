@@ -1,11 +1,11 @@
 # импорты
 import vk_api
-import data
+import base_data
 from sqlalchemy import create_engine
 from vk_api.longpoll import VkEventType, VkLongPoll
 from vk_api.utils import get_random_id
 from config import access_token, comunity_token, db_url_object
-from core import VkTools
+from basic import VkTools
 
 class BotInterface():
     def __init__(self, comunity_token, access_token, engine):
@@ -49,17 +49,29 @@ class BotInterface():
                     # 3 запрос - запускаем бота и проверяем профиль, запашиваем неизвестные данные
                 elif command == 'бот':
                     self.message_send(event.user_id, 'Запускаю работу и анализирую твой профиль.')
+
+                    # Проверяем и устанавливаем значение города
                     if self.params.get("city") is None:
                         self.message_send(event.user_id,
                                           'Укажите Ваш город в формате "город <название>"\n например "город Москва".')
                         continue
+
+                    # Проверяем и устанавливаем значение возраста
                     elif self.params.get("bdate") is None:
                         self.message_send(event.user_id,
                                           'Укажите Ваш возраст в формате "возраст <число>"\n например "возраст 18".')
                         continue
+
+                    # Проверяем и устанавливаем значение пола
+                    elif self.params.get("sex") is None:
+                        self.message_send(event.user_id,
+                                          'Укажите Ваш пол в формате "пол <число>"\n 1 - женский, 2 - мужской.')
+                        continue
+
+                    # Если все данные (город, возраст, пол) установлены, начинаем поиск анкет
                     else:
                         self.message_send(event.user_id,
-                                          'Город и возраст записали из твоей анкеты.\n Для просмотра анкет напиши команду показать анкеты')
+                                          'Город, возраст и пол записали из твоей анкеты.\n Для просмотра анкет напиши команду показать анкеты')
                     # 4 запрос - если нет города
                 elif command.startswith("город "):
                     city_name = ' '.join(event.text.lower().split()[1:])
@@ -86,26 +98,19 @@ class BotInterface():
                                       'Вы успешно установили свой возраст.\n Для просмотра анкет напиши команду показать анкеты')
                     # 6 запрос - запускаем анкеты
                 elif command == 'показать анкеты' or command == 'показать анкету' or command == 'п':
-                    # логика поиска анкет
+                    if not self.worksheets:
+                        self.worksheets = self.vk_tools.search_worksheet(self.params, self.offset)
                     if self.worksheets:
                         worksheet = self.worksheets.pop()
                         photos = self.vk_tools.get_photos(worksheet['id'])
                         photo_string = ''
                         for photo in photos:
                             photo_string += f'photo{photo["owner_id"]}_{photo["id"]},'
-                    else:
-                        self.worksheets = self.vk_tools.search_worksheet(self.params, self.offset)
-                        worksheet = self.worksheets.pop()
-                        photos = self.vk_tools.get_photos(worksheet['id'])
-                        photo_string = ''
-                        for photo in photos:
-                            photo_string += f'photo{photo["owner_id"]}_{photo["id"]},'
-                        self.offset += 10
-                    self.message_send(event.user_id, f'имя: {worksheet["name"]} ссылка: vk.com/{worksheet["id"]}',
-                                      attachment=photo_string)
-                    # Проверка и добавление в бд
-                    if not data_store.check_user(engine, event.user_id, worksheet["id"]):
-                        data_store.add_user(engine, event.user_id, worksheet["id"])
+                        self.message_send(event.user_id, f'имя: {worksheet["name"]} ссылка: vk.com/{worksheet["id"]}',
+                                          attachment=photo_string)
+                        # Проверка и добавление в бд
+                        if not data.check_user(engine, event.user_id, worksheet["id"]):
+                            data.add_user(engine, event.user_id, worksheet["id"])
                     # 8 запрос - завершение клиентом
                 elif command == 'пока' or command == "нет" or command == "стоп" or command == "завершить" or command == "закончить" or command == "конец":
                     self.message_send(event.user_id,
