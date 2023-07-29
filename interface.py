@@ -1,6 +1,6 @@
 # импорты
 import vk_api
-import DB
+import data
 from sqlalchemy import create_engine
 from vk_api.longpoll import VkEventType, VkLongPoll
 from vk_api.utils import get_random_id
